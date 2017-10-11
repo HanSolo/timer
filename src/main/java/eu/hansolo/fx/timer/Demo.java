@@ -57,7 +57,7 @@ public class Demo extends Application {
 
         Scene scene = new Scene(pane);
 
-        stage.setTitle("TimerFX");
+        stage.setTitle("Timer");
         stage.setScene(scene);
         stage.show();
     }
