@@ -16,9 +16,11 @@
 
 package eu.hansolo.fx.timer;
 
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.Property;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.geometry.Dimension2D;
@@ -49,6 +51,16 @@ public class TimerBuilder<B extends TimerBuilder<B>> {
 
     public B color(final Color COLOR) {
         properties.put("color", new SimpleObjectProperty<>(COLOR));
+        return (B)this;
+    }
+
+    public B waitingColor(final Color COLOR) {
+        properties.put("waitingColor", new SimpleObjectProperty(COLOR));
+        return (B)this;
+    }
+
+    public B playButtonVisible(final boolean VISIBLE) {
+        properties.put("playButtonVisible", new SimpleBooleanProperty(VISIBLE));
         return (B)this;
     }
 
@@ -174,6 +186,10 @@ public class TimerBuilder<B extends TimerBuilder<B>> {
                 CONTROL.setBackgroundColor(((ObjectProperty<Color>) properties.get(key)).get());
             } else if ("color".equals(key)) {
                 CONTROL.setColor(((ObjectProperty<Color>) properties.get(key)).get());
+            } else if ("waitingColor".equals(key)) {
+                CONTROL.setWaitingColor(((ObjectProperty<Color>) properties.get(key)).get());
+            } else if ("playButtonVisible".equals(key)) {
+                CONTROL.setPlayButtonVisible(((BooleanProperty) properties.get(key)).get());
             } else if ("duration".equals(key)) {
                 CONTROL.setDuration(((ObjectProperty<Duration>) properties.get(key)).get());
             }

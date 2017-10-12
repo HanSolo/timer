@@ -17,10 +17,13 @@
 package eu.hansolo.fx.timer;
 
 import eu.hansolo.fx.timer.TimerEvent.Type;
+import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.beans.DefaultProperty;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.BooleanPropertyBase;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.DoublePropertyBase;
 import javafx.beans.property.ObjectProperty;
@@ -63,6 +66,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 @DefaultProperty("children")
 public class Timer extends Region {
+    public  enum         State { RUNNING, WAITING, STOPPED }
     public  static final Color                    DEFAULT_COLOR    = Color.web("0x407DBD");
     private static final double                   PREFERRED_WIDTH  = 19;
     private static final double                   PREFERRED_HEIGHT = 19;
@@ -75,6 +79,7 @@ public class Timer extends Region {
     private        final TimerEvent               CONTINUED        = new TimerEvent(Timer.this, Type.CONTINUED);
     private        final TimerEvent               FINISHED         = new TimerEvent(Timer.this, Type.FINISHED);
     private        final TimerEvent               RESET            = new TimerEvent(Timer.this, Type.RESET);
+    private        final TimerEvent               WAITING          = new TimerEvent(Timer.this, Type.WAITING);
     private              double                   size;
     private              double                   width;
     private              double                   height;
@@ -84,7 +89,7 @@ public class Timer extends Region {
     private              Paint                    backgroundPaint;
     private              Paint                    borderPaint;
     private              double                   borderWidth;
-    private              Circle                   ring;
+    private              Arc                      ring;
     private              Arc                      progressBar;
     private              Rectangle                stopButton;
     private              Path                     playButton;
@@ -95,7 +100,12 @@ public class Timer extends Region {
     private              ObjectProperty<Color>    backgroundColor;
     private              Color                    _color;
     private              ObjectProperty<Color>    color;
+    private              Color                    _waitingColor;
+    private              ObjectProperty<Color>    waitingColor;
+    private              boolean                  _playButtonVisible;
+    private              BooleanProperty          playButtonVisible;
     private              DoubleProperty           progress;
+    private              State                    state;
     private              Duration                 _duration;
     private              ObjectProperty<Duration> duration;
     private              Duration                 currentDuration;
@@ -106,19 +116,22 @@ public class Timer extends Region {
     // ******************** Constructors **************************************
     public Timer() {
         getStylesheets().add(Timer.class.getResource("timer.css").toExternalForm());
-        backgroundPaint  = Color.TRANSPARENT;
-        borderPaint      = Color.TRANSPARENT;
-        borderWidth      = 0d;
-        _backgroundColor = Color.TRANSPARENT;
-        _color           = DEFAULT_COLOR;
-        _duration        = Duration.seconds(10);
-        currentDuration  = Duration.ZERO;
-        progress         = new DoublePropertyBase(0) {
+        backgroundPaint    = Color.TRANSPARENT;
+        borderPaint        = Color.TRANSPARENT;
+        borderWidth        = 0d;
+        _backgroundColor   = Color.TRANSPARENT;
+        _color             = DEFAULT_COLOR;
+        _waitingColor      = DEFAULT_COLOR;
+        _playButtonVisible = true;
+        state              = State.STOPPED;
+        _duration          = Duration.seconds(10);
+        currentDuration    = Duration.ZERO;
+        progress           = new DoublePropertyBase(0) {
             @Override protected void invalidated() { progressBar.setLength(-360.0 * get()); }
             @Override public Object getBean() { return Timer.this; }
             @Override public String getName() { return "progress"; }
         };
-        timeline         = new Timeline();
+        timeline           = new Timeline();
         initGraphics();
         registerListeners();
     }
@@ -137,7 +150,9 @@ public class Timer extends Region {
 
         getStyleClass().add("timer");
 
-        ring = new Circle(PREFERRED_WIDTH * 0.5, _backgroundColor);
+        ring = new Arc();
+        ring.setStartAngle(0);
+        ring.setLength(360);
         ring.setStroke(_color);
         ring.setStrokeType(StrokeType.INSIDE);
 
@@ -148,17 +163,20 @@ public class Timer extends Region {
         progressBar.setStrokeLineCap(StrokeLineCap.BUTT);
         progressBar.setStartAngle(90);
         progressBar.setLength(0);
+        progressBar.setMouseTransparent(true);
 
         stopButton = new Rectangle();
         stopButton.setVisible(false);
         stopButton.setManaged(false);
         stopButton.setStroke(null);
+        stopButton.setMouseTransparent(true);
 
         playButtonP1 = new MoveTo();
         playButtonP2 = new LineTo();
         playButtonP3 = new LineTo();
         playButton = new Path(playButtonP1, playButtonP2, playButtonP3, new ClosePath());
         playButton.setStroke(null);
+        playButton.setMouseTransparent(true);
 
         pane = new Pane(ring, progressBar, stopButton, playButton);
         pane.setBackground(new Background(new BackgroundFill(backgroundPaint, CornerRadii.EMPTY, Insets.EMPTY)));
@@ -174,12 +192,11 @@ public class Timer extends Region {
             finished();
             fireTimerEvent(FINISHED);
         });
-        stopButton.setOnMousePressed(event -> stop());
-        playButton.setOnMousePressed(event -> {
-            if (currentDuration.greaterThan(Duration.ZERO)) {
-                startFromCurrent();
-            } else {
-                start();
+        ring.setOnMousePressed(event -> {
+            switch(state) {
+                case RUNNING: stop();break;
+                case STOPPED: if (currentDuration.greaterThan(Duration.ZERO)) { startFromCurrent(); } else { start(); } break;
+                case WAITING: stop();break;
             }
         });
     }
@@ -194,6 +211,27 @@ public class Timer extends Region {
     @Override protected double computeMaxHeight(final double WIDTH) { return MAXIMUM_HEIGHT; }
 
     @Override public ObservableList<Node> getChildren() { return super.getChildren(); }
+
+    public Color getBackgroundColor() { return null == backgroundColor ? _backgroundColor : backgroundColor.get(); }
+    public void setBackgroundColor(final Color COLOR) {
+        if (null == backgroundColor) {
+            _backgroundColor = COLOR;
+            redraw();
+        } else {
+            backgroundColor.set(COLOR);
+        }
+    }
+    public ObjectProperty<Color> backgroundColorProperty() {
+        if (null == backgroundColor) {
+            backgroundColor = new ObjectPropertyBase<Color>(_backgroundColor) {
+                @Override protected void invalidated() { redraw(); }
+                @Override public Object getBean() { return Timer.this; }
+                @Override public String getName() { return "backgroundColor"; }
+            };
+            _backgroundColor = null;
+        }
+        return backgroundColor;
+    }
 
     public Color getColor() { return null == color ? _color : color.get(); }
     public void setColor(final Color COLOR) {
@@ -216,25 +254,46 @@ public class Timer extends Region {
         return color;
     }
 
-    public Color getBackgroundColor() { return null == backgroundColor ? _backgroundColor : backgroundColor.get(); }
-    public void setBackgroundColor(final Color COLOR) {
-        if (null == backgroundColor) {
-            _backgroundColor = COLOR;
+    public Color getWaitingColor() { return null == waitingColor ? _waitingColor : waitingColor.get(); }
+    public void setWaitingColor(final Color COLOR) {
+        if (null == waitingColor) {
+            _waitingColor = COLOR;
             redraw();
         } else {
-            backgroundColor.set(COLOR);
+            waitingColor.set(COLOR);
+            redraw();
         }
     }
-    public ObjectProperty<Color> backgroundColorProperty() {
-        if (null == backgroundColor) {
-            backgroundColor = new ObjectPropertyBase<Color>(_backgroundColor) {
+    public ObjectProperty<Color> waitingColorProperty() {
+        if (null == waitingColor) {
+            waitingColor = new ObjectPropertyBase<Color>(_waitingColor) {
                 @Override protected void invalidated() { redraw(); }
                 @Override public Object getBean() { return Timer.this; }
-                @Override public String getName() { return "backgroundColor"; }
+                @Override public String getName() { return "waitingColor"; }
             };
-            _backgroundColor = null;
+            _waitingColor = null;
         }
-        return backgroundColor;
+        return waitingColor;
+    }
+
+    public boolean isPlayButtonVisible() { return null == playButtonVisible ? _playButtonVisible : playButtonVisible.get(); }
+    public void setPlayButtonVisible(final boolean VISIBLE) {
+        if (null == playButtonVisible) {
+            _playButtonVisible = VISIBLE;
+            if (VISIBLE) { enableNode(playButton); } else { disableNode(playButton); }
+        } else {
+            playButtonVisible.set(VISIBLE);
+        }
+    }
+    public BooleanProperty playButtonVisibleProperty() {
+        if (null == playButtonVisible) {
+            playButtonVisible = new BooleanPropertyBase(_playButtonVisible) {
+                @Override protected void invalidated() { if (get()) { enableNode(playButton); } else { disableNode(playButton); }}
+                @Override public Object getBean() { return Timer.this; }
+                @Override public String getName() { return "playButtonVisible"; }
+            };
+        }
+        return playButtonVisible;
     }
 
     public double getProgress() { return progress.get(); }
@@ -261,6 +320,8 @@ public class Timer extends Region {
     }
 
     public void start() {
+        ring.setLength(360);
+
         KeyValue kv0 = new KeyValue(progress, 0.0);
         KeyValue kv1 = new KeyValue(progress, 1.0);
 
@@ -269,17 +330,18 @@ public class Timer extends Region {
 
         timeline.getKeyFrames().setAll(kf0, kf1);
 
-        playButton.setVisible(false);
-        playButton.setManaged(false);
+        if (isPlayButtonVisible()) { disableNode(playButton); }
+        enableNode(stopButton);
 
-        stopButton.setManaged(true);
-        stopButton.setVisible(true);
-
+        timeline.setCycleCount(1);
         timeline.playFromStart();
 
+        state = State.RUNNING;
         fireTimerEvent(STARTED);
     }
     public void startFromCurrent() {
+        ring.setLength(360);
+
         KeyValue kv0 = new KeyValue(progress, 0.0);
         KeyValue kv1 = new KeyValue(progress, 1.0);
 
@@ -289,47 +351,84 @@ public class Timer extends Region {
         timeline.getKeyFrames().setAll(kf0, kf1);
         timeline.jumpTo(currentDuration);
 
-        playButton.setVisible(false);
-        playButton.setManaged(false);
+        if (isPlayButtonVisible()) { disableNode(playButton); }
+        enableNode(stopButton);
 
-        stopButton.setManaged(true);
-        stopButton.setVisible(true);
-
+        timeline.setCycleCount(1);
         timeline.play();
 
+        state = State.RUNNING;
         fireTimerEvent(CONTINUED);
     }
     public void stop() {
-        currentDuration = timeline.getCurrentTime();
+        currentDuration = state == State.WAITING ? Duration.ZERO : timeline.getCurrentTime();
         timeline.stop();
+        timeline.setCycleCount(1);
 
-        stopButton.setVisible(false);
-        stopButton.setManaged(false);
+        ring.setLength(360);
+        ring.setStroke(getColor());
 
-        playButton.setManaged(true);
-        playButton.setVisible(true);
+        disableNode(stopButton);
+        stopButton.setFill(getColor());
+        if (isPlayButtonVisible()) { enableNode(playButton); }
 
+        state = State.STOPPED;
         fireTimerEvent(STOPPED);
     }
     public void reset() {
         finished();
         fireTimerEvent(RESET);
     }
+    public void waiting() {
+        timeline.stop();
+        KeyValue kv0 = new KeyValue(ring.rotateProperty(), 0);
+        KeyValue kv1 = new KeyValue(ring.rotateProperty(), 360);
+
+        KeyFrame kf0 = new KeyFrame(Duration.ZERO, kv0);
+        KeyFrame kf1 = new KeyFrame(Duration.seconds(1), kv1);
+
+        timeline.getKeyFrames().setAll(kf0, kf1);
+
+        ring.setLength(300);
+        ring.setStroke(getWaitingColor());
+
+        if (isPlayButtonVisible()) { disableNode(playButton); }
+        stopButton.setFill(getWaitingColor());
+        enableNode(stopButton);
+
+        timeline.setCycleCount(Animation.INDEFINITE);
+        timeline.play();
+
+        state = State.WAITING;
+        fireTimerEvent(WAITING);
+    }
     private void finished() {
         timeline.stop();
+        timeline.setCycleCount(1);
+
+        ring.setLength(360);
         setProgress(0);
         currentDuration = Duration.ZERO;
-        stopButton.setVisible(false);
-        stopButton.setManaged(false);
 
-        playButton.setManaged(true);
-        playButton.setVisible(true);
+        disableNode(stopButton);
+        if (isPlayButtonVisible()) { enableNode(playButton); }
+
+        state = State.STOPPED;
     }
 
     private double clamp(final double min, final double max, final double value) {
         if (value < min) return min;
         if (value > max) return max;
         return value;
+    }
+
+    private void enableNode(final Node NODE) {
+        NODE.setManaged(true);
+        NODE.setVisible(true);
+    }
+    private void disableNode(final Node NODE) {
+        NODE.setVisible(false);
+        NODE.setManaged(false);
     }
 
 
@@ -358,7 +457,8 @@ public class Timer extends Region {
 
             ring.setCenterX(centerX);
             ring.setCenterY(centerY);
-            ring.setRadius(centerX);
+            ring.setRadiusX(centerX);
+            ring.setRadiusY(centerY);
             ring.setStrokeWidth(size * 0.05263158);
 
             progressBar.setCenterX(centerX);
@@ -384,10 +484,10 @@ public class Timer extends Region {
 
     private void redraw() {
         ring.setFill(getBackgroundColor());
-        ring.setStroke(getColor());
+        ring.setStroke(state == State.WAITING ? getWaitingColor() : getColor());
         progressBar.setFill(getBackgroundColor());
         progressBar.setStroke(getColor());
-        stopButton.setFill(getColor());
+        stopButton.setFill(state == State.WAITING ? getWaitingColor() : getColor());
         playButton.setFill(getColor());
         pane.setBackground(new Background(new BackgroundFill(backgroundPaint, CornerRadii.EMPTY, Insets.EMPTY)));
         pane.setBorder(new Border(new BorderStroke(borderPaint, BorderStrokeStyle.SOLID, CornerRadii.EMPTY, new BorderWidths(borderWidth / PREFERRED_WIDTH * size))));

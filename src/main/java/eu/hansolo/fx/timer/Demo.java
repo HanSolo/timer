@@ -35,18 +35,19 @@ public class Demo extends Application {
 
     @Override public void init() {
         timer = TimerBuilder.create()
+                            .playButtonVisible(false)
+                            .waitingColor(Color.GRAY)
                             .duration(Duration.seconds(30))
                             .prefSize(38, 38)
                             .build();
         timer.setOnTimerEvent(event -> {
-            /*
             switch(event.getType()) {
-                case STARTED  : timer.setColor(Color.GREEN); break;
-                case CONTINUED: timer.setColor(Color.GREEN); break;
-                case STOPPED  : timer.setColor(Color.RED); break;
-                case FINISHED :timer.setColor(Timer.DEFAULT_COLOR); break;
+                case STARTED  : break;
+                case CONTINUED: break;
+                case STOPPED  : timer.setPlayButtonVisible(true); break;
+                case FINISHED : break;
+                case WAITING  : break;
             }
-            */
             System.out.println(event.getType());
         });
     }
@@ -60,6 +61,8 @@ public class Demo extends Application {
         stage.setTitle("Timer");
         stage.setScene(scene);
         stage.show();
+
+        timer.waiting();
     }
 
     @Override public void stop() {

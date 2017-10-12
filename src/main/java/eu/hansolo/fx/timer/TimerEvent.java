@@ -18,7 +18,7 @@ package eu.hansolo.fx.timer;
 
 public class TimerEvent {
     public enum Type {
-        STARTED, STOPPED, CONTINUED, FINISHED, RESET
+        STARTED, STOPPED, CONTINUED, FINISHED, RESET, WAITING
     }
 
     private final Object src;
