@@ -18,11 +18,15 @@ package eu.hansolo.fx.timer;
 
 import javafx.application.Application;
 import javafx.geometry.Insets;
+import javafx.scene.control.Label;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.scene.layout.StackPane;
 import javafx.scene.Scene;
 import javafx.util.Duration;
+
+import java.util.Locale;
 
 
 /**
@@ -32,6 +36,8 @@ import javafx.util.Duration;
  */
 public class Demo extends Application {
     private Timer timer;
+    private Label label;
+
 
     @Override public void init() {
         timer = TimerBuilder.create()
@@ -44,16 +50,18 @@ public class Demo extends Application {
             switch(event.getType()) {
                 case STARTED  : break;
                 case CONTINUED: break;
-                case STOPPED  : timer.setPlayButtonVisible(true); break;
-                case FINISHED : break;
+                case STOPPED  : timer.setPlayButtonVisible(true);break;
+                case FINISHED : label.setText("0 s"); break;
                 case WAITING  : break;
+                case SECOND   : label.setText(String.format(Locale.US, "%.1f s", timer.getCurrentTime().toSeconds()));
             }
             System.out.println(event.getType());
         });
+        label = new Label();
     }
 
     @Override public void start(Stage stage) {
-        StackPane pane = new StackPane(timer);
+        VBox pane = new VBox(10, timer, label);
         pane.setPadding(new Insets(30));
 
         Scene scene = new Scene(pane);

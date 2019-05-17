@@ -29,6 +29,7 @@ import javafx.beans.property.DoublePropertyBase;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ObjectPropertyBase;
 import javafx.beans.property.ReadOnlyDoubleProperty;
+import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;
 import javafx.geometry.Insets;
@@ -80,6 +81,7 @@ public class Timer extends Region {
     private        final TimerEvent               FINISHED         = new TimerEvent(Timer.this, Type.FINISHED);
     private        final TimerEvent               RESET            = new TimerEvent(Timer.this, Type.RESET);
     private        final TimerEvent               WAITING          = new TimerEvent(Timer.this, Type.WAITING);
+    private        final TimerEvent               SECOND           = new TimerEvent(Timer.this, Type.SECOND);
     private              double                   size;
     private              double                   width;
     private              double                   height;
@@ -191,6 +193,9 @@ public class Timer extends Region {
         timeline.setOnFinished(event -> {
             finished();
             fireTimerEvent(FINISHED);
+        });
+        timeline.currentTimeProperty().addListener((o, ov, nv) -> {
+            if ((int) nv.toSeconds() > (int) ov.toSeconds()) { fireTimerEvent(SECOND); }
         });
         ring.setOnMousePressed(event -> {
             switch(state) {
@@ -318,6 +323,10 @@ public class Timer extends Region {
         }
         return duration;
     }
+
+    public Duration getCurrentTime() { return timeline.getCurrentTime(); }
+
+    public ReadOnlyObjectProperty<Duration> currentTimeProperty() { return timeline.currentTimeProperty(); }
 
     public void start() {
         ring.setLength(360);

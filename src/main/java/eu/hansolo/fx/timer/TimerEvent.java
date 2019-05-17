@@ -18,22 +18,22 @@ package eu.hansolo.fx.timer;
 
 public class TimerEvent {
     public enum Type {
-        STARTED, STOPPED, CONTINUED, FINISHED, RESET, WAITING
+        STARTED, STOPPED, CONTINUED, FINISHED, RESET, WAITING, SECOND
     }
 
-    private final Object src;
-    private final Type   type;
+    private final Timer timer;
+    private final Type  type;
 
 
     // ******************** Constructor ***************************************
-    public TimerEvent(final Object SRC, final Type TYPE) {
-        src  = SRC;
-        type = TYPE;
+    public TimerEvent(final Timer TIMER, final Type TYPE) {
+        timer = TIMER;
+        type  = TYPE;
     }
 
 
     // ******************** Methods *******************************************
-    public Object getSource() { return src; }
+    public Timer getTimer() { return timer; }
 
     public Type getType() { return type; }
 }
